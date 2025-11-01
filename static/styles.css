@@ -1,0 +1,57 @@
+/*
+ * Stellar Tracker Stylesheet (styles.css)
+ * Used in conjunction with Tailwind CSS classes in index.html.
+ */
+
+/* Custom Font for a modern look */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #1a202c; /* Dark background from Tailwind config */
+}
+
+/* Style for the map container */
+#map {
+    height: 400px; 
+    width: 100%;
+    border-radius: 0.75rem; /* rounded-xl */
+    border: 2px solid #6366f1; /* Indigo border for a tech/atlas look */
+}
+
+/* --- Custom Marker Animation (The "Stellarium" Effect) --- */
+
+/* The main container for the animated marker */
+.pulsing-marker {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: #e5e7eb; /* Star color (light gray) */
+    box-shadow: 0 0 10px #e5e7eb; /* Initial glow */
+    position: relative;
+}
+
+/* The pulsating ring */
+.pulsing-marker::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background-color: rgba(99, 102, 241, 0.5); /* Semi-transparent indigo */
+    animation: pulse 2s infinite ease-out; /* Apply the animation */
+}
+
+/* The CSS Keyframes for the Pulse Animation */
+@keyframes pulse {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(3); /* Expands to 3x size */
+        opacity: 0; /* Fades out completely */
+    }
+}

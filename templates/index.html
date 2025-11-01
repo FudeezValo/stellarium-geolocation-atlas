@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stellarium Geolocation & Cosmic Tracker</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Link to the external CSS file -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    
+    <!-- Load Leaflet for the Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <!-- Custom Tailwind Config for cleaner colors -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'dark-bg': '#1a202c',
+                        'card-bg': '#1f2937',
+                        'indigo-primary': '#6366f1',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="min-h-screen flex items-start justify-center p-4">
+
+    <div class="w-full max-w-4xl bg-gray-900 shadow-2xl rounded-xl p-8 space-y-8 border-t-4 border-indigo-primary text-white">
+        <h1 class="text-4xl font-extrabold text-gray-50 text-center">
+            <span class="text-indigo-400">🌌 COSMIC</span> Geo-Observatory
+        </h1>
+        <p class="text-center text-gray-400">
+            Real-time coordinates, atmospheric conditions, and celestial phenomena.
+        </p>
+        
+        <!-- === MAP AND COORDINATES SECTION === -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2">
+                <div id="map"></div>
+            </div>
+            <div class="space-y-4">
+                <div id="status" class="text-center text-blue-400 font-semibold h-6">
+                    Ready for celestial coordinates.
+                </div>
+                <div class="grid grid-cols-2 gap-4 text-center">
+                    <div class="bg-indigo-900/50 p-4 rounded-lg shadow-sm">
+                        <p class="text-sm font-medium text-indigo-400">Latitude (Lat)</p>
+                        <p id="latitude" class="text-2xl font-extrabold text-gray-100 mt-1">N/A</p>
+                    </div>
+                    <div class="bg-indigo-900/50 p-4 rounded-lg shadow-sm">
+                        <p class="text-sm font-medium text-indigo-400">Longitude (Lon)</p>
+                        <p id="longitude" class="text-2xl font-extrabold text-gray-100 mt-1">N/A</p>
+                    </div>
+                </div>
+
+                <button onclick="getLocation()"
+                        id="locate-button"
+                        class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg shadow-lg transition duration-150 ease-in-out transform hover:scale-[1.01] focus:outline-none focus:ring-4 focus:ring-indigo-500 focus:ring-opacity-50">
+                    Locate User Position
+                </button>
+            </div>
+        </div>
+
+        <!-- === DATA PANELS (WEATHER, CELESTIAL, ORBITAL) === -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+
+            <!-- 1. Live Weather Panel -->
+            <div class="bg-gray-800 p-5 rounded-xl shadow-lg border border-indigo-700 space-y-3">
+                <h3 class="text-xl font-bold text-indigo-300 flex items-center">
+                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    Atmospheric Data
+                </h3>
+                <p id="weather-temp" class="text-4xl font-extrabold text-gray-100">N/A</p>
+                <p id="weather-desc" class="text-lg text-gray-300">Awaiting location signal...</p>
+                <p id="weather-humidity" class="text-sm text-gray-400">Humidity: N/A</p>
+            </div>
+
+            <!-- 2. Celestial & Comets Panel -->
+            <div class="bg-gray-800 p-5 rounded-xl shadow-lg border border-indigo-700 space-y-3">
+                <h3 class="text-xl font-bold text-indigo-300 flex items-center">
+                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9h.01"></path></svg>
+                    Cosmic Tracker
+                </h3>
+                <p id="cosmic-event" class="text-lg font-semibold text-gray-100">Loading events...</p>
+                <p id="cosmic-next-comet" class="text-md text-gray-300">Next Bright Comet: N/A</p>
+                <p id="cosmic-moon" class="text-sm text-gray-400">Moon Phase: N/A</p>
+            </div>
+
+            <!-- 3. Orbital Objects & People Panel (ISS) -->
+            <div class="bg-gray-800 p-5 rounded-xl shadow-lg border border-indigo-700 space-y-3">
+                <h3 class="text-xl font-bold text-indigo-300 flex items-center">
+                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                    Orbital Network
+                </h3>
+                <p id="orbital-iss-status" class="text-lg font-semibold text-gray-100">ISS Position: Unknown</p>
+                <p id="orbital-people" class="text-md text-gray-300">Astronauts in space: N/A</p>
+                <p id="orbital-pass-time" class="text-sm text-gray-400">Next Pass Time: N/A</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // MapTiler API Key (provided by user)
+        const MAPTILER_API_KEY = 'bWT53Ry9wqiUDn1WBX7N';
+        
+        // ** API Keys Placeholder ** - You must obtain and insert real keys here
+        // NOTE: For security, a Python backend (Flask) is the better place to store these keys
+        // if you want to use them. For now, they remain here as placeholders.
+        const OPENWEATHER_API_KEY = 'YOUR_OPENWEATHER_API_KEY'; 
+
+        // Initialize Map in a default location (e.g., Greenwich)
+        const initialLat = 51.4779;
+        const initialLon = 0.0015;
+        const initialZoom = 2; // World view
+
+        // Create the map object
+        const map = L.map('map', {
+            zoomControl: false, 
+            scrollWheelZoom: true // Enabled for better navigation
+        }).setView([initialLat, initialLon], initialZoom);
+
+        // Add the MapTiler "DataViz Dark" layer
+        L.tileLayer(`https://api.maptiler.com/maps/dataviz-dark/{z}/{x}/{y}.png?key=${MAPTILER_API_KEY}`, {
+            attribution: 'Map data &copy; <a href="https://www.maptiler.com/">MapTiler</a> contributors',
+            maxZoom: 18,
+        }).addTo(map);
+
+        let userMarker = null; // Variable to hold the user's location marker
+
+        /**
+         * Attempts to retrieve the user's current geographic location using the Geolocation API.
+         */
+        function getLocation() {
+            const statusDiv = document.getElementById('status');
+            const latSpan = document.getElementById('latitude');
+            const lonSpan = document.getElementById('longitude');
+            const locateButton = document.getElementById('locate-button');
+
+            // Set loading state
+            statusDiv.textContent = 'Scanning Earth\'s grid...';
+            statusDiv.classList.remove('text-red-400', 'text-green-400');
+            statusDiv.classList.add('text-blue-400');
+            locateButton.disabled = true;
+            locateButton.textContent = 'Locating...';
+            latSpan.textContent = '...';
+            lonSpan.textContent = '...';
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        // Success callback
+                        const { latitude, longitude } = position.coords;
+
+                        statusDiv.textContent = 'Location acquired. Star locked.';
+                        statusDiv.classList.remove('text-blue-400');
+                        statusDiv.classList.add('text-green-400');
+                        latSpan.textContent = latitude.toFixed(6);
+                        lonSpan.textContent = longitude.toFixed(6);
+
+                        // 1. Update the Map Center and Zoom
+                        map.setView([latitude, longitude], 13);
+                        
+                        // 2. Create the Animated Marker
+                        const customIcon = L.divIcon({
+                            className: 'custom-div-icon',
+                            html: '<div class="pulsing-marker"></div>',
+                            iconSize: [20, 20], 
+                            iconAnchor: [10, 10]
+                        });
+
+                        // 3. Add or Move the Marker
+                        if (userMarker) {
+                            userMarker.setLatLng([latitude, longitude]);
+                        } else {
+                            userMarker = L.marker([latitude, longitude], { icon: customIcon }).addTo(map);
+                        }
+
+                        // 4. *** FETCH ADDITIONAL DATA ***
+                        fetchWeatherData(latitude, longitude);
+                        fetchCelestialData(latitude, longitude);
+                        fetchOrbitalData(latitude, longitude); 
+
+                        // Restore button
+                        locateButton.disabled = false;
+                        locateButton.textContent = 'Locate User Position';
+                    },
+                    (error) => {
+                        // Error callback
+                        statusDiv.classList.remove('text-blue-400');
+                        statusDiv.classList.add('text-red-400');
+                        latSpan.textContent = 'N/A';
+                        lonSpan.textContent = 'N/A';
+                        
+                        let message = 'Unknown signal interference.';
+                        switch (error.code) {
+                            case error.PERMISSION_DENIED:
+                                message = 'Permission Denied: Location access blocked. Cannot acquire position.';
+                                break;
+                            case error.POSITION_UNAVAILABLE:
+                                message = 'Position Unavailable: Location data not found on this device.';
+                                break;
+                            case error.TIMEOUT:
+                                message = 'Timeout: The signal was lost during transmission.';
+                                break;
+                        }
+                        statusDiv.textContent = `Error: ${message}`;
+
+                        // Restore button
+                        locateButton.disabled = false;
+                        locateButton.textContent = 'Locate User Position';
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 15000,
+                        maximumAge: 0
+                    }
+                );
+            } else {
+                // Geolocation API is not supported
+                statusDiv.textContent = 'Geolocation hardware not supported by this browser.';
+                statusDiv.classList.add('text-red-400');
+                latSpan.textContent = 'N/A';
+                lonSpan.textContent = 'N/A';
+                locateButton.disabled = true;
+                locateButton.textContent = 'System Not Found';
+            }
+        }
+
+
+        /**
+         * Fetches live weather data. Requires a valid OPENWEATHER_API_KEY.
+         */
+        async function fetchWeatherData(lat, lon) {
+            const tempDiv = document.getElementById('weather-temp');
+            const descDiv = document.getElementById('weather-desc');
+            const humDiv = document.getElementById('weather-humidity');
+
+            tempDiv.textContent = 'Fetching...';
+            descDiv.textContent = '';
+            humDiv.textContent = '';
+
+            // This call will fail unless you provide a real key.
+            if (OPENWEATHER_API_KEY.startsWith('YOUR')) {
+                tempDiv.textContent = 'KEY MISSING';
+                descDiv.textContent = 'Update OPENWEATHER_API_KEY.';
+                humDiv.textContent = '';
+                return;
+            }
+
+            try {
+                const response = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${OPENWEATHER_API_KEY}&units=metric`);
+                const data = await response.json();
+                
+                if(data.main) {
+                    tempDiv.textContent = `${data.main.temp.toFixed(1)}°C`;
+                    descDiv.textContent = `${data.weather[0].description.toUpperCase()} over ${data.name}`;
+                    humDiv.textContent = `Humidity: ${data.main.humidity}% | Wind: ${data.wind.speed} m/s`;
+                } else {
+                    tempDiv.textContent = 'API Error';
+                    descDiv.textContent = 'Check API Key or Network.';
+                }
+            } catch (error) {
+                console.error('Weather data fetch error:', error);
+                tempDiv.textContent = 'Offline';
+                descDiv.textContent = 'Could not contact weather service.';
+            }
+        }
+
+
+        /**
+         * Fetches celestial/astronomy data (using placeholder text for now).
+         */
+        function fetchCelestialData(lat, lon) {
+            const eventDiv = document.getElementById('cosmic-event');
+            const cometDiv = document.getElementById('cosmic-next-comet');
+            const moonDiv = document.getElementById('cosmic-moon');
+
+            // --- Placeholder Logic ---
+            eventDiv.textContent = 'Sky Map Data Loaded';
+            cometDiv.textContent = 'Next Comet: C/2023 A3 (TBD)';
+            moonDiv.textContent = 'Moon Phase: Waxing Gibbous'; 
+            // -------------------------
+        }
+
+
+        /**
+         * Fetches orbital object data (e.g., ISS location and people in space).
+         * Uses public APIs that do not require keys.
+         */
+        async function fetchOrbitalData(lat, lon) {
+            const statusDiv = document.getElementById('orbital-iss-status');
+            const peopleDiv = document.getElementById('orbital-people');
+            const passDiv = document.getElementById('orbital-pass-time');
+            
+            statusDiv.textContent = 'Tracking ISS...';
+            peopleDiv.textContent = 'Counting astronauts...';
+            passDiv.textContent = 'Calculating next pass...';
+
+            try {
+                // 1. Fetch People in Space
+                const peopleResponse = await fetch('http://api.open-notify.org/astros.json');
+                const peopleData = await peopleResponse.json();
+                peopleDiv.textContent = `Astronauts in space: ${peopleData.number}`;
+
+                // 2. Fetch ISS Pass Time (when it will pass overhead)
+                const passResponse = await fetch(`http://api.open-notify.org/iss-pass.json?lat=${lat}&lon=${lon}`);
+                const passData = await passResponse.json();
+                if (passData.response && passData.response.length > 0) {
+                    const nextPassTime = new Date(passData.response[0].risetime * 1000).toLocaleTimeString();
+                    passDiv.textContent = `Next Pass Time: ${nextPassTime} UTC`;
+                } else {
+                    passDiv.textContent = `Next Pass Time: N/A (Data limited)`;
+                }
+
+                // 3. Fetch current ISS Location 
+                const issResponse = await fetch('http://api.open-notify.org/iss-now.json');
+                const issData = await issResponse.json();
+                statusDiv.textContent = `ISS Position: ${issData.iss_position.latitude}, ${issData.iss_position.longitude}`;
+                
+            } catch (error) {
+                console.error('Orbital data fetch error:', error);
+                statusDiv.textContent = 'Orbital Signal Lost.';
+                peopleDiv.textContent = 'Count Failed.';
+                passDiv.textContent = 'Pass Time Unavailable.';
+            }
+        }
+    </script>
+</body>
+</html>
